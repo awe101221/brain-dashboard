@@ -234,7 +234,7 @@ const Positions = ({ data }) => {
 // ─── Thesis Tracker ────────────────────────────────────────────
 const ThesisCard = ({ t }) => {
   const [open, setOpen] = useState(false);
-  const cc = CONFIDENCE_COLORS[t.confidence_level] || C.textDim;
+  const cc = CONFIDENCE_COLORS[t.confidence] || C.textDim;
   return (
     <div style={{
       background: C.bg + "88", borderRadius: 10, padding: 14,
@@ -242,16 +242,16 @@ const ThesisCard = ({ t }) => {
       borderLeft: `3px solid ${cc}`,
     }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6, lineHeight: 1.4 }}>
-        {t.thesis_statement || "Untitled thesis"}
+        {t.thesis || "Untitled thesis"}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
-        <Pill label={t.confidence_level || "?"} color={cc} small />
+        <Pill label={t.confidence || "?"} color={cc} small />
         {t.status && <Pill label={t.status} color={t.status === "active" ? C.green : t.status === "invalidated" ? C.red : C.yellow} small />}
         {t.time_horizon && <Pill label={t.time_horizon} color={C.textDim} small />}
       </div>
-      {t.linked_tickers && t.linked_tickers.length > 0 && (
+      {t.positions_linked && t.positions_linked.length > 0 && (
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 6 }}>
-          {(Array.isArray(t.linked_tickers) ? t.linked_tickers : [t.linked_tickers]).map((tk, i) => (
+          {(Array.isArray(t.positions_linked) ? t.positions_linked : [t.positions_linked]).map((tk, i) => (
             <span key={i} style={{
               fontSize: 11, fontWeight: 700, color: C.blue, background: C.blue + "18",
               padding: "1px 6px", borderRadius: 4, fontFamily: "'JetBrains Mono', monospace",
@@ -418,7 +418,18 @@ const BrainStats = ({ brainEntries, positions, researchNotes }) => {
     return Object.entries(map).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   }, [researchNotes]);
 
-  const chartLabel = ({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : "";
+  const chartLabel = ({ name, percent, cx, cy, midAngle, innerRadius, outerRadius }) => {
+    if (percent < 0.05) return null;
+    const RADIAN = Math.PI / 180;
+    const radius = outerRadius + 16;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+    return (
+      <text x={x} y={y} fill={C.textDim} textAnchor={x > cx ? "start" : "end"} dominantBaseline="central" style={{ fontSize: 9 }}>
+        {`${name} ${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
 
   if (catData.length === 0 && statusData.length === 0 && resCatData.length === 0) return null;
 
@@ -433,7 +444,7 @@ const BrainStats = ({ brainEntries, positions, researchNotes }) => {
             </div>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
-                <Pie data={catData} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" label={chartLabel} labelLine={false} style={{ fontSize: 9 }}>
+                <Pie data={catData} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" nameKey="name" label={chartLabel} labelLine={false} isAnimationActive={false}>
                   {catData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
                 <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11, color: C.text }} />
@@ -448,7 +459,7 @@ const BrainStats = ({ brainEntries, positions, researchNotes }) => {
             </div>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
-                <Pie data={statusData} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" label={chartLabel} labelLine={false} style={{ fontSize: 9 }}>
+                <Pie data={statusData} cx="50%" cy="50%" innerRadius={35} outerRadius={65} dataKey="value" nameKey="name" label={chartLabel} labelLine={false} isAnimationActive={false}>
                   {statusData.map((d, i) => <Cell key={i} fill={STATUS_COLORS[d.name] || PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
                 <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11, color: C.text }} />
@@ -462,10 +473,10 @@ const BrainStats = ({ brainEntries, positions, researchNotes }) => {
               Research by Category
             </div>
             <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={resCatData} layout="vertical" margin={{ left: 60, right: 8, top: 4, bottom: 4 }}>
+              <BarChart data={resCatData} layout="vertical" margin={{ left: 8, right: 8, top: 4, bottom: 4 }}>
                 <XAxis type="number" hide />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: C.textDim }} width={55} />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: C.textDim }} width={80} />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]} isAnimationActive={false}>
                   {resCatData.map((d, i) => <Cell key={i} fill={CATEGORY_COLORS[d.name] || PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Bar>
                 <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11, color: C.text }} cursor={{ fill: C.border + "33" }} />
@@ -608,8 +619,8 @@ export default function BrainDashboard() {
 
       {/* Header */}
       <div style={{
-        position: "sticky", top: 0, zIndex: 50, background: C.bg + "EE",
-        backdropFilter: "blur(12px)", borderBottom: `1px solid ${C.border}33`,
+        position: "relative", zIndex: 50, background: C.bg,
+        borderBottom: `1px solid ${C.border}33`,
         padding: "12px 16px",
       }}>
         <div style={{ maxWidth: 960, margin: "0 auto" }}>
@@ -630,7 +641,7 @@ export default function BrainDashboard() {
 
       {/* Tab Bar */}
       <div style={{
-        position: "sticky", top: 95, zIndex: 40, background: C.bg + "EE",
+        position: "sticky", top: 0, zIndex: 45, background: C.bg + "EE",
         backdropFilter: "blur(12px)", borderBottom: `1px solid ${C.border}33`,
         overflowX: "auto", WebkitOverflowScrolling: "touch",
       }}>
@@ -644,8 +655,9 @@ export default function BrainDashboard() {
               color: activeTab === t.id ? C.blue : C.textDim, borderRadius: 8,
               padding: "6px 10px", fontSize: 11, cursor: "pointer", fontWeight: 600,
               whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4,
+              position: "relative", zIndex: 2,
             }}>
-              <span style={{ fontSize: 13 }}>{t.icon}</span> {t.label}
+              <span style={{ fontSize: 13, pointerEvents: "none" }}>{t.icon}</span> {t.label}
             </button>
           ))}
         </div>
